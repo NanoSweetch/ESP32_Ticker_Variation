@@ -1,5 +1,7 @@
 This code was originally written by Patrick-E-Rankin. 
 
+Check the instruction on @BloxyLabs" title="YouTube">YouTube
+
 <h3><u>Libraries Used:</u></h3>
     <p><a href="https://github.com/bartoszbielawski/LEDMatrixDriver" target="_blank">LEDMatrixDriver</a>
       by <a href="https://github.com/bartoszbielawski" target="_blank">Bartosz
