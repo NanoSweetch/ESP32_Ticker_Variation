@@ -1,6 +1,9 @@
 This code was originally written by Patrick-E-Rankin. 
 
-Check the instruction on how to use it on [YouTube](https://www.youtube.com/watch?v=CYbc3wALT1w "YouTube")
+Check the instruction on how to use it on [YouTube](https://www.youtube.com/watch?v=CYbc3wALT1w "YouTube").
+<br>
+<br>
+If you had fun with the projects, please consider buying us a [cup of coffee](https://www.buymeacoffee.com/bloxylabs "cupofcoffee").
 
 <h3><u>Libraries Used:</u></h3>
     <p><a href="https://github.com/bartoszbielawski/LEDMatrixDriver" target="_blank">LEDMatrixDriver</a>
