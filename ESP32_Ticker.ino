@@ -21,7 +21,7 @@ const int ANIM_DELAY = 75; //75 is slow enough
 String ticker1 = "none";
 char displayString[30] = "";
 const char* PARAM_INPUT_1 = "input1";
-const char Index[] = "<!DOCTYPE HTML><html><head><title>ESP32 Stock Ticker</title><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><body><form action=\"/get\">Ticker Symbol: <input type=\"text\" name=\"input1\"><input type=\"submit\" value=\"Submit\"></form><br><a href=\"https://github.com/ESP32_Ticker\">ESP32StockTicker</a></body></html>";
+const char Index[] = "<!DOCTYPE HTML><html><head><title>ESP32 Stock Ticker</title><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><body><form action=\"/get\">Ticker Symbol: <input type=\"text\" name=\"input1\"><input type=\"submit\" value=\"Submit\"></form><br><a href=\"https://github.com/BloxyLabs/ESP32_Ticker\">ESP32StockTicker</a></body></html>";
 
 void notFound(AsyncWebServerRequest *request) {
   request->send(404, "text/plain", "Not found");
