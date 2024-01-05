@@ -55,3 +55,8 @@ If you had fun with the projects, please consider buying us a [cup of coffee](ht
     <p>The program will automatically check for a new price every 5 seconds.</p>
     <p>It also supports crypto, but you must use the Yahoo Finance format, for
       example BTC-USD for Bitcoin.</p>
+
+<h3><u>Known issues</u></h3>
+It is not common, but we received a report from an user about an ESP crash with the error:<br>
+"Guru Meditation Error: Core  1 panic'ed (LoadProhibited). Exception was unhandled." <br>
+This user solved the issue by increasing price buffer in the line " char pricebuffer[sizeof(tempmarketprice)+10]; " from +1 to +10.
