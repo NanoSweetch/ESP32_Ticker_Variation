@@ -1,35 +1,20 @@
-//This code came from https://github.com/Patrick-E-Rankin/ESP32StockTicker
-//Your free to do what you want with it, if you have any useful changes/code clean up, then please let me know.
-
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <LEDMatrixDriver.hpp>
-#include <ESPAsyncWebSrv.h>
-
-AsyncWebServer server(80);
+#include <ESPAsyncWebServer.h>
 
 const char* ssid = "YourWiFiSSID";
 const char* password = "YourWiFiPassword";
-String serverName = "https://query1.finance.yahoo.com/v8/finance/chart/";
-String token = "?interval=1d";
-const uint8_t LEDMATRIX_CS_PIN = 15;
-const int LEDMATRIX_SEGMENTS = 4;
-const int LEDMATRIX_WIDTH    = LEDMATRIX_SEGMENTS * 8;
-LEDMatrixDriver lmd(LEDMATRIX_SEGMENTS, LEDMATRIX_CS_PIN);
-const int ANIM_DELAY = 75; //75 is slow enough
-String ticker1 = "none";
-char displayString[30] = "";
-const char* PARAM_INPUT_1 = "input1";
-const char Index[] = "<!DOCTYPE HTML><html><head><title>ESP32 Stock Ticker</title><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><body><form action=\"/get\">Ticker Symbol: <input type=\"text\" name=\"input1\"><input type=\"submit\" value=\"Submit\"></form><br><a href=\"https://github.com/BloxyLabs/ESP32_Ticker\">ESP32StockTicker</a></body></html>";
+String serverName = "https://query1.finance.yahoo.com/v8/finance/chart/";  // URL de base de l'API pour BTC-USD
+String ticker = "BTC-USD";  // Ticker par défaut
+const uint8_t LEDMATRIX_CS_PIN = 15;  // Pin CS pour la matrice LED
+const int LEDMATRIX_SEGMENTS = 4;  // Nombre de segments de la matrice LED
+const int LEDMATRIX_WIDTH = LEDMATRIX_SEGMENTS * 8;  // Largeur totale de la matrice
+LEDMatrixDriver lmd(LEDMATRIX_SEGMENTS, LEDMATRIX_CS_PIN);  // Initialisation de la matrice LED
 
-void notFound(AsyncWebServerRequest *request) {
-  request->send(404, "text/plain", "Not found");
-}
+const int ANIM_DELAY = 90;  // Vitesse du défilement du texte
 
-TaskHandle_t Task1;
-
-int x=0, y=0;   // start top left
 byte font[95][8] = { {0,0,0,0,0,0,0,0}, // SPACE
                      {0x10,0x18,0x18,0x18,0x18,0x00,0x18,0x18}, // EXCL
                      {0x28,0x28,0x08,0x00,0x00,0x00,0x00,0x00}, // QUOT
@@ -89,143 +74,152 @@ byte font[95][8] = { {0,0,0,0,0,0,0,0}, // SPACE
                      {0x00,0x82,0x44,0x28,0x10,0x28,0x44,0x82}, // X
                      {0x00,0x82,0x44,0x28,0x10,0x10,0x10,0x10}, // Y
                      {0x00,0xfe,0x04,0x08,0x10,0x20,0x40,0xfe}, // Z
-                      // (the font does not contain any lower case letters. you can add your own.)
-                  };    // {}, //
+                      // (the font does not contain any lower case letters. you can add your own.)                       
+};
 
-void drawSprite( byte* sprite, int x, int y, int width, int height )
-{
-  // The mask is used to get the column bit from the sprite row
+int x = LEDMATRIX_WIDTH;  // Position de départ pour le défilement
+char displayString[50] = "";  // Texte à afficher sur la matrice LED
+
+void drawSprite(byte* sprite, int x, int y, int width, int height) {
   byte mask = B10000000;
-
-  for( int iy = 0; iy < height; iy++ )
-  {
-    for( int ix = 0; ix < width; ix++ )
-    {
-      lmd.setPixel(x + ix, y + iy, (bool)(sprite[iy] & mask ));
-
-      // shift the mask by one pixel to the right
+  for (int iy = 0; iy < height; iy++) {
+    for (int ix = 0; ix < width; ix++) {
+      lmd.setPixel(x + ix, y + iy, (bool)(sprite[iy] & mask));
       mask = mask >> 1;
     }
-
-    // reset column mask
     mask = B10000000;
   }
 }
 
-void drawString(char* text, int len, int x, int y )
-{
-  for( int idx = 0; idx < len; idx ++ )
-  {
+void drawString(char* text, int len, int x, int y) {
+  for (int idx = 0; idx < len; idx++) {
     int c = text[idx] - 32;
-
-    // stop if char is outside visible area
-    if( x + idx * 8  > LEDMATRIX_WIDTH )
+    if (x + idx * 8 > LEDMATRIX_WIDTH)
       return;
-
-    // only draw if char is visible
-    if( 8 + x + idx * 8 > 0 )
-      drawSprite( font[c], x + idx * 8, y, 8, 8 );
+    if (8 + x + idx * 8 > 0)
+      drawSprite(font[c], x + idx * 8, y, 8, 8);
   }
 }
 
-void LEDDisplay(void * parameter){
-
-            while(true){
-
-            int len = strlen(displayString);
-  
-            drawString(displayString, len, x, 0);
-           
-            lmd.display();
-            delay(ANIM_DELAY);
-            if( --x < len * -8 ) {
-              x = LEDMATRIX_WIDTH;
-              }
-            }
+void LEDDisplay(void* parameter) {
+  while (true) {
+    int len = strlen(displayString);
+    drawString(displayString, len, x, 0);
+    lmd.display();
+    delay(ANIM_DELAY);
+    if (--x < len * -8) {
+      x = LEDMATRIX_WIDTH;
+    }
+  }
 }
 
-void setup() 
-{
+// Crée un serveur web asynchrone
+AsyncWebServer server(80);
+
+void setup() {
   Serial.begin(115200);
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) 
-  {
+
+  // Connexion Wi-Fi
+  while (WiFi.status() != WL_CONNECTED) {
     Serial.println(".");
     delay(500);
   }
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
+
+  // Initialisation de la matrice LED
   lmd.setEnabled(true);
-  lmd.setIntensity(0);   // 0 = low, 10 = high
-  char text[30];
+  lmd.setIntensity(0);   // Intensity de l'affichage (0 = faible, 10 = fort)
+
+  // Crée un task pour gérer l'affichage
+  xTaskCreatePinnedToCore(LEDDisplay, "LedDisplay", 1000, NULL, 1, NULL, 0);
+
+  // Affichage de l'adresse IP au démarrage
+  char text[50];
   String IP = WiFi.localIP().toString();
-  strcat(text,IP.c_str());
-  memcpy(displayString,text,30); 
-  xTaskCreatePinnedToCore(LEDDisplay,"LedDisplay",1000,NULL,1,&Task1,0);
-  delay(1000);
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){request->send(200, "text/html", Index);});
-  server.on("/get", HTTP_GET, [] (AsyncWebServerRequest *request) 
-  {
-    String inputMessage;
-    String inputParam;
-    // GET input1 value on <ESP_IP>/get?input1=<inputMessage>
-    if (request->hasParam(PARAM_INPUT_1)) 
-    {
-      inputMessage = request->getParam(PARAM_INPUT_1)->value();
-      inputParam = PARAM_INPUT_1;
-      ticker1 = inputMessage;
+  strcpy(text, "IP: ");
+  strcat(text, IP.c_str());
+  memcpy(displayString, text, sizeof(displayString));
+
+  // Mise à jour toutes les 5 secondes
+  delay(5000);
+
+  // Serveur Web pour entrer un ticker
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    String html = "<html><body><h2>Choisir un Ticker</h2>";
+    html += "<form action=\"/setTicker\" method=\"GET\">";
+    html += "Ticker (ex : BTC-USD, ETH-USD): <input type=\"text\" name=\"ticker\" value=\"" + ticker + "\"><br><br>";
+    html += "<input type=\"submit\" value=\"Envoyer\">";
+    html += "</form></body></html>";
+    request->send(200, "text/html", html);
+  });
+
+  // Action de mise à jour du ticker via le formulaire
+  server.on("/setTicker", HTTP_GET, [](AsyncWebServerRequest *request){
+    if (request->hasParam("ticker")) {
+      ticker = request->getParam("ticker")->value();
+      Serial.println("Nouveau Ticker: " + ticker);
     }
-      request->redirect("/");
-   });
-    server.onNotFound(notFound);
-    server.begin();
+    request->redirect("/");
+  });
+
+  // Démarrer le serveur web
+  server.begin();
 }
 
 void loop() {
-    if((WiFi.status()== WL_CONNECTED) && (ticker1 != "none"))
-    {
-      HTTPClient http;
-      http.begin(serverName+ticker1+token);
-      int httpResponseCode = http.GET();
-      
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    String url = serverName + ticker + "?interval=1d";  // URL de l'API avec le ticker sélectionné
+    http.begin(url);  // Requête à l'API pour le ticker
 
-      if (httpResponseCode > 0) 
-      {
-        Serial.print("HTTP Response Code: ");
-        Serial.println(httpResponseCode);
-        String payload = http.getString();
+    int httpResponseCode = http.GET();
 
-        DynamicJsonDocument doc(2048);
-        DeserializationError error = deserializeJson(doc, payload);
-        if (error) 
-        {
-          Serial.print(F("deserializeJson() failed: "));
-          Serial.println(error.f_str());
-          return;
-        }
-        JsonObject chart_result_0 = doc["chart"]["result"][0];
-        JsonObject chart_result_0_meta = chart_result_0["meta"];
-        const char* tempsymbol = chart_result_0_meta["symbol"];
-        float tempmarketprice = chart_result_0_meta["regularMarketPrice"]; 
-        Serial.println(tempsymbol);
-        Serial.println(tempmarketprice);
-        char pricebuffer[sizeof(tempmarketprice)+1];
-        dtostrf(tempmarketprice, sizeof(tempmarketprice), 2, pricebuffer);
-        char text[30] = "";
-        strcat(text,tempsymbol);
-        strcat(text," ");
-        strcat(text,pricebuffer);
-        strcat(text," ");     
-        memcpy(displayString,text,30);
+    if (httpResponseCode > 0) {
+      String payload = http.getString();
+      DynamicJsonDocument doc(2048);
+      DeserializationError error = deserializeJson(doc, payload);
+      if (error) {
+        Serial.print(F("deserializeJson() failed: "));
+        Serial.println(error.f_str());
+        return;
+      }
+
+      JsonObject chart_result_0 = doc["chart"]["result"][0];
+      JsonObject chart_result_0_meta = chart_result_0["meta"];
+      const char* tempsymbol = chart_result_0_meta["symbol"];
+      float tempmarketprice = chart_result_0_meta["regularMarketPrice"];
+      float temppreviousclose = chart_result_0_meta["chartPreviousClose"];
+
+      // Vérification si les prix sont valides
+      if (temppreviousclose != 0 && !isnan(tempmarketprice) && !isnan(temppreviousclose)) {
+        float tempchangepercent = ((tempmarketprice - temppreviousclose) / temppreviousclose) * 100;
+
+        // Formatage des résultats
+        char pricebuffer[10];
+        char changebuffer[10];
+        dtostrf(tempmarketprice, 6, 2, pricebuffer);
+        dtostrf(tempchangepercent, 5, 2, changebuffer);
+
+        // Création de la chaîne de texte à afficher
+        char text[50] = "";
+        strcat(text, tempsymbol);  // Symbole du ticker (BTC-USD)
+        strcat(text, " ");         // Espace
+        strcat(text, pricebuffer); // Prix
+        strcat(text, "$ ");        // Symbole $
+        strcat(text, changebuffer); // Variation en %
+        strcat(text, "%");          // Symbole %
+
+        // Mise à jour de la chaîne d'affichage
+        memcpy(displayString, text, sizeof(displayString));
         Serial.println(displayString);
       }
-      else 
-      {
-        Serial.print("Error Code: ");
-        Serial.println(httpResponseCode);
-      }
-      http.end();
-      delay(5000);
+    } else {
+      Serial.print("Error Code: ");
+      Serial.println(httpResponseCode);
     }
-      
+    http.end();
+    delay(5000); // Rafraîchissement toutes les 5 secondes
+  }
 }
